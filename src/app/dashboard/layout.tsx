@@ -1,6 +1,54 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 function Sidebar() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const [propertyName, setPropertyName] = useState("");
+  const [userName, setUserName] = useState("");
+  const [userInitials, setUserInitials] = useState("");
+
+  useEffect(() => {
+    async function loadUserData() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: staffData } = await supabase
+        .from("staff")
+        .select("name, property_id, properties(name)")
+        .eq("user_id", user.id)
+        .single();
+
+      if (staffData) {
+        setUserName(staffData.name);
+        const initials = staffData.name
+          .split(" ")
+          .map((n: string) => n[0])
+          .join("")
+          .toUpperCase()
+          .slice(0, 2);
+        setUserInitials(initials);
+        // Handle the joined property data
+        const prop = staffData.properties as unknown as { name: string } | null;
+        if (prop) {
+          setPropertyName(prop.name);
+        }
+      }
+    }
+    loadUserData();
+  }, []);
+
+  async function handleSignOut() {
+    await supabase.auth.signOut();
+    router.push("/");
+  }
+
   const navItems = [
     {
       label: "Packages",
@@ -22,15 +70,6 @@ function Sidebar() {
       ),
     },
     {
-      label: "Notifications",
-      href: "/dashboard/notifications",
-      icon: (
-        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
-        </svg>
-      ),
-    },
-    {
       label: "Settings",
       href: "/dashboard/settings",
       icon: (
@@ -42,11 +81,16 @@ function Sidebar() {
     },
   ];
 
+  function isActive(href: string) {
+    if (href === "/dashboard") return pathname === "/dashboard";
+    return pathname.startsWith(href);
+  }
+
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-white/5 bg-surface">
+    <aside className="fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-foreground/5 bg-white">
       {/* Logo */}
-      <div className="flex h-16 items-center border-b border-white/5 px-6">
-        <Link href="/dashboard" className="text-lg font-bold tracking-tight text-white">
+      <div className="flex h-16 items-center border-b border-foreground/5 px-6">
+        <Link href="/dashboard" className="text-lg font-bold tracking-tight text-foreground">
           Received
         </Link>
       </div>
@@ -57,7 +101,11 @@ function Sidebar() {
           <Link
             key={item.label}
             href={item.href}
-            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/60 transition-colors hover:bg-white/5 hover:text-white"
+            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+              isActive(item.href)
+                ? "bg-purple/10 text-purple font-medium"
+                : "text-text-muted hover:bg-surface-alt hover:text-foreground"
+            }`}
           >
             {item.icon}
             {item.label}
@@ -66,19 +114,25 @@ function Sidebar() {
       </nav>
 
       {/* Bottom */}
-      <div className="border-t border-white/5 p-4">
-        <div className="mb-3 rounded-lg bg-white/5 px-3 py-2">
-          <p className="text-xs font-medium text-white/70">Property</p>
-          <p className="truncate text-sm text-white">Indianapolis Marriott</p>
-        </div>
+      <div className="border-t border-foreground/5 p-4">
+        {propertyName && (
+          <div className="mb-3 rounded-lg bg-surface-alt px-3 py-2">
+            <p className="text-xs font-medium text-text-muted">Property</p>
+            <p className="truncate text-sm font-medium text-foreground">{propertyName}</p>
+          </div>
+        )}
         <div className="flex items-center gap-3 px-1">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple/20 text-xs font-medium text-purple">
-            DC
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple/10 text-xs font-medium text-purple">
+            {userInitials || "??"}
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="truncate text-sm text-white">Daniel C.</p>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm text-foreground">{userName || "Loading..."}</p>
           </div>
-          <button className="text-white/30 transition-colors hover:text-white/60">
+          <button
+            onClick={handleSignOut}
+            title="Sign out"
+            className="text-text-muted/40 transition-colors hover:text-foreground"
+          >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
             </svg>
@@ -95,34 +149,9 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background">
       <Sidebar />
       <main className="pl-64">
-        <div className="border-b border-white/5 bg-surface/50 backdrop-blur-sm">
-          <div className="flex h-16 items-center justify-between px-8">
-            <h1 className="text-lg font-semibold text-white">Dashboard</h1>
-            <div className="relative">
-              <svg
-                className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
-                />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search packages..."
-                className="h-9 w-64 rounded-lg border border-white/10 bg-white/5 pl-9 pr-4 text-sm text-white placeholder-white/25 outline-none transition-colors focus:border-purple"
-              />
-            </div>
-          </div>
-        </div>
         <div className="p-8">{children}</div>
       </main>
     </div>

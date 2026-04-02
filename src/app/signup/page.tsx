@@ -1,95 +1,157 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
 export default function SignupPage() {
+  const router = useRouter();
+  const [propertyName, setPropertyName] = useState("");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      // 1. Sign up the user
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (authError) throw authError;
+      if (!authData.user) throw new Error("Signup failed — no user returned.");
+
+      const userId = authData.user.id;
+
+      // 2. Create the property
+      const { data: property, error: propError } = await supabase
+        .from("properties")
+        .insert({ name: propertyName, owner_id: userId })
+        .select()
+        .single();
+
+      if (propError) throw propError;
+
+      // 3. Create staff record (admin)
+      const { error: staffError } = await supabase.from("staff").insert({
+        user_id: userId,
+        property_id: property.id,
+        name,
+        role: "admin",
+      });
+
+      if (staffError) throw staffError;
+
+      router.push("/dashboard");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Something went wrong.";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center px-6">
+    <div className="flex min-h-screen items-center justify-center bg-background px-6">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <Link href="/" className="text-2xl font-bold tracking-tight text-white">
+          <Link href="/" className="text-2xl font-bold tracking-tight text-foreground">
             Received
           </Link>
-          <p className="mt-2 text-sm text-white/40">
+          <p className="mt-2 text-sm text-text-muted">
             3-day free trial. No credit card required.
           </p>
         </div>
 
-        <div className="rounded-2xl border border-white/5 bg-surface p-8">
-          <form className="space-y-5">
+        <div className="rounded-2xl border border-foreground/5 bg-white p-8 shadow-sm">
+          {error && (
+            <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label
-                htmlFor="property"
-                className="mb-1.5 block text-sm font-medium text-white/70"
-              >
+              <label htmlFor="property" className="mb-1.5 block text-sm font-medium text-foreground/70">
                 Property Name
               </label>
               <input
                 id="property"
                 type="text"
+                required
+                value={propertyName}
+                onChange={(e) => setPropertyName(e.target.value)}
                 placeholder="The Grand Hotel"
-                className="h-11 w-full rounded-lg border border-white/10 bg-white/5 px-4 text-sm text-white placeholder-white/25 outline-none transition-colors focus:border-purple"
+                className="h-11 w-full rounded-lg border border-foreground/10 bg-surface-alt px-4 text-sm text-foreground placeholder-foreground/30 outline-none transition-colors focus:border-purple"
               />
             </div>
 
             <div>
-              <label
-                htmlFor="name"
-                className="mb-1.5 block text-sm font-medium text-white/70"
-              >
+              <label htmlFor="name" className="mb-1.5 block text-sm font-medium text-foreground/70">
                 Your Name
               </label>
               <input
                 id="name"
                 type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 placeholder="Jane Smith"
-                className="h-11 w-full rounded-lg border border-white/10 bg-white/5 px-4 text-sm text-white placeholder-white/25 outline-none transition-colors focus:border-purple"
+                className="h-11 w-full rounded-lg border border-foreground/10 bg-surface-alt px-4 text-sm text-foreground placeholder-foreground/30 outline-none transition-colors focus:border-purple"
               />
             </div>
 
             <div>
-              <label
-                htmlFor="email"
-                className="mb-1.5 block text-sm font-medium text-white/70"
-              >
+              <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-foreground/70">
                 Email
               </label>
               <input
                 id="email"
                 type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@hotel.com"
-                className="h-11 w-full rounded-lg border border-white/10 bg-white/5 px-4 text-sm text-white placeholder-white/25 outline-none transition-colors focus:border-purple"
+                className="h-11 w-full rounded-lg border border-foreground/10 bg-surface-alt px-4 text-sm text-foreground placeholder-foreground/30 outline-none transition-colors focus:border-purple"
               />
             </div>
 
             <div>
-              <label
-                htmlFor="password"
-                className="mb-1.5 block text-sm font-medium text-white/70"
-              >
+              <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-foreground/70">
                 Password
               </label>
               <input
                 id="password"
                 type="password"
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="h-11 w-full rounded-lg border border-white/10 bg-white/5 px-4 text-sm text-white placeholder-white/25 outline-none transition-colors focus:border-purple"
+                className="h-11 w-full rounded-lg border border-foreground/10 bg-surface-alt px-4 text-sm text-foreground placeholder-foreground/30 outline-none transition-colors focus:border-purple"
               />
             </div>
 
             <button
               type="submit"
-              className="h-11 w-full rounded-lg bg-purple text-sm font-medium text-white transition-colors hover:bg-purple-hover"
+              disabled={loading}
+              className="h-11 w-full rounded-lg bg-purple text-sm font-medium text-white transition-colors hover:bg-purple-hover disabled:opacity-50"
             >
-              Start Free Trial
+              {loading ? "Creating account..." : "Start Free Trial"}
             </button>
           </form>
         </div>
 
-        <p className="mt-6 text-center text-sm text-white/40">
+        <p className="mt-6 text-center text-sm text-text-muted">
           Already have an account?{" "}
-          <Link
-            href="/login"
-            className="text-purple transition-colors hover:text-purple-hover"
-          >
+          <Link href="/login" className="text-purple transition-colors hover:text-purple-hover">
             Sign in
           </Link>
         </p>
