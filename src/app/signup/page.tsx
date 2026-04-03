@@ -31,7 +31,15 @@ export default function SignupPage() {
 
       const userId = authData.user.id;
 
-      // 2. Create the property
+      // 2. Sign in immediately to establish session cookies
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError) throw signInError;
+
+      // 3. Create the property
       const { data: property, error: propError } = await supabase
         .from("properties")
         .insert({ name: propertyName, owner_id: userId })
@@ -40,7 +48,7 @@ export default function SignupPage() {
 
       if (propError) throw propError;
 
-      // 3. Create staff record (admin)
+      // 4. Create staff record (admin)
       const { error: staffError } = await supabase.from("staff").insert({
         user_id: userId,
         property_id: property.id,
@@ -50,7 +58,8 @@ export default function SignupPage() {
 
       if (staffError) throw staffError;
 
-      router.push("/dashboard");
+      // Full reload so middleware picks up session cookies
+      window.location.href = "/dashboard";
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Something went wrong.";
       setError(message);
