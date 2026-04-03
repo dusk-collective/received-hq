@@ -1,11 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 
 export async function POST(request: NextRequest) {
   try {
-    const { image } = await request.json();
+    // Verify authenticated user
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll() {},
+        },
+      }
+    );
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { image } = body;
 
     if (!image) {
       return NextResponse.json({ error: "No image provided" }, { status: 400 });
+    }
+
+    // Reject oversized payloads (10MB base64 limit)
+    if (image.length > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: "Image too large" }, { status: 413 });
     }
 
     const apiKey = process.env.ANTHROPIC_API_KEY;

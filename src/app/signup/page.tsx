@@ -39,24 +39,13 @@ export default function SignupPage() {
 
       if (signInError) throw signInError;
 
-      // 3. Create the property
-      const { data: property, error: propError } = await supabase
-        .from("properties")
-        .insert({ name: propertyName, owner_id: userId })
-        .select()
-        .single();
-
-      if (propError) throw propError;
-
-      // 4. Create staff record (admin)
-      const { error: staffError } = await supabase.from("staff").insert({
-        user_id: userId,
-        property_id: property.id,
-        name,
-        role: "admin",
+      // 3. Create property + staff atomically via RPC
+      const { error: bootstrapError } = await supabase.rpc("bootstrap_tenant", {
+        p_property_name: propertyName,
+        p_staff_name: name,
       });
 
-      if (staffError) throw staffError;
+      if (bootstrapError) throw bootstrapError;
 
       // Full reload so middleware picks up session cookies
       window.location.href = "/dashboard";
