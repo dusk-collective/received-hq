@@ -34,7 +34,6 @@ function Sidebar() {
           .toUpperCase()
           .slice(0, 2);
         setUserInitials(initials);
-        // Handle the joined property data
         const prop = staffData.properties as unknown as { name: string } | null;
         if (prop) {
           setPropertyName(prop.name);
@@ -87,46 +86,67 @@ function Sidebar() {
   }
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-foreground/5 bg-white">
-      {/* Logo */}
-      <div className="flex h-16 items-center border-b border-foreground/5 px-6">
+    <>
+      {/* Desktop sidebar */}
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-foreground/5 bg-white md:flex">
+        <div className="flex h-16 items-center border-b border-foreground/5 px-6">
+          <Link href="/dashboard" className="text-lg font-bold tracking-tight text-foreground">
+            Received
+          </Link>
+        </div>
+
+        <nav className="flex-1 space-y-1 px-3 py-4">
+          {navItems.map((item) => (
+            <Link
+              key={item.label}
+              href={item.href}
+              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                isActive(item.href)
+                  ? "bg-purple/10 text-purple font-medium"
+                  : "text-text-muted hover:bg-surface-alt hover:text-foreground"
+              }`}
+            >
+              {item.icon}
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="border-t border-foreground/5 p-4">
+          {propertyName && (
+            <div className="mb-3 rounded-lg bg-surface-alt px-3 py-2">
+              <p className="text-xs font-medium text-text-muted">Property</p>
+              <p className="truncate text-sm font-medium text-foreground">{propertyName}</p>
+            </div>
+          )}
+          <div className="flex items-center gap-3 px-1">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple/10 text-xs font-medium text-purple">
+              {userInitials || "??"}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm text-foreground">{userName || "Loading..."}</p>
+            </div>
+            <button
+              onClick={handleSignOut}
+              title="Sign out"
+              className="text-text-muted/40 transition-colors hover:text-foreground"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* Mobile top header */}
+      <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-foreground/5 bg-white px-4 md:hidden">
         <Link href="/dashboard" className="text-lg font-bold tracking-tight text-foreground">
           Received
         </Link>
-      </div>
-
-      {/* Nav */}
-      <nav className="flex-1 space-y-1 px-3 py-4">
-        {navItems.map((item) => (
-          <Link
-            key={item.label}
-            href={item.href}
-            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
-              isActive(item.href)
-                ? "bg-purple/10 text-purple font-medium"
-                : "text-text-muted hover:bg-surface-alt hover:text-foreground"
-            }`}
-          >
-            {item.icon}
-            {item.label}
-          </Link>
-        ))}
-      </nav>
-
-      {/* Bottom */}
-      <div className="border-t border-foreground/5 p-4">
-        {propertyName && (
-          <div className="mb-3 rounded-lg bg-surface-alt px-3 py-2">
-            <p className="text-xs font-medium text-text-muted">Property</p>
-            <p className="truncate text-sm font-medium text-foreground">{propertyName}</p>
-          </div>
-        )}
-        <div className="flex items-center gap-3 px-1">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple/10 text-xs font-medium text-purple">
+        <div className="flex items-center gap-3">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-purple/10 text-xs font-medium text-purple">
             {userInitials || "??"}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm text-foreground">{userName || "Loading..."}</p>
           </div>
           <button
             onClick={handleSignOut}
@@ -138,8 +158,26 @@ function Sidebar() {
             </svg>
           </button>
         </div>
-      </div>
-    </aside>
+      </header>
+
+      {/* Mobile bottom tab bar */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-foreground/5 bg-white md:hidden">
+        {navItems.map((item) => (
+          <Link
+            key={item.label}
+            href={item.href}
+            className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors ${
+              isActive(item.href)
+                ? "text-purple"
+                : "text-text-muted"
+            }`}
+          >
+            {item.icon}
+            {item.label}
+          </Link>
+        ))}
+      </nav>
+    </>
   );
 }
 
@@ -151,8 +189,10 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
-      <main className="pl-64">
-        <div className="p-8">{children}</div>
+      <main className="md:pl-64">
+        <div className="px-4 pb-20 pt-[72px] md:p-8 md:pb-8 md:pt-8">
+          {children}
+        </div>
       </main>
     </div>
   );

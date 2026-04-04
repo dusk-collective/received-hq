@@ -189,114 +189,158 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Packages Table */}
-      <div className="overflow-hidden rounded-xl border border-foreground/5 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-foreground/5">
-                {["Tracking #", "Recipient", "Carrier", "Status", "Received", "Storage", "Actions"].map(
-                  (col) => (
-                    <th
-                      key={col}
-                      className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted/60"
-                    >
-                      {col}
-                    </th>
-                  )
-                )}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-foreground/5">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-16 text-center">
-                    <div className="flex flex-col items-center">
-                      <svg
-                        className="mb-4 h-12 w-12 text-foreground/10"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        strokeWidth={1}
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"
-                        />
-                      </svg>
-                      <p className="mb-1 text-sm font-medium text-text-muted">
-                        {packages.length === 0
-                          ? "No packages logged yet"
-                          : "No packages match your filters"}
-                      </p>
-                      <p className="text-xs text-text-muted/60">
-                        {packages.length === 0
-                          ? "Scan your first package to get started."
-                          : "Try adjusting your search or filter."}
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((pkg) => {
-                  const badge = STATUS_BADGES[pkg.status] || STATUS_BADGES.received;
-                  return (
-                    <tr key={pkg.id} className="hover:bg-surface-alt/50 transition-colors">
-                      <td className="px-6 py-4 text-sm font-mono text-foreground/70">
-                        {pkg.tracking_number || "—"}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-foreground">
-                          {pkg.recipient_name}
-                        </div>
-                        {pkg.room_number && (
-                          <div className="text-xs text-text-muted">
-                            Room {pkg.room_number}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-text-muted">
-                        {pkg.carrier || "—"}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${badge.className}`}
-                        >
-                          {badge.label}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-text-muted">
-                        {pkg.received_at
-                          ? new Date(pkg.received_at).toLocaleString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              hour: "numeric",
-                              minute: "2-digit",
-                            })
-                          : "—"}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-text-muted">
-                        {pkg.storage_location || "—"}
-                      </td>
-                      <td className="px-6 py-4">
-                        {(pkg.status === "received" || pkg.status === "notified") && (
-                          <button
-                            onClick={() => markPickedUp(pkg)}
-                            className="rounded-md bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
-                          >
-                            Mark Picked Up
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+      {/* Packages — Table on desktop, Cards on mobile */}
+      {filtered.length === 0 ? (
+        <div className="flex flex-col items-center rounded-xl border border-foreground/5 bg-white py-16 shadow-sm">
+          <svg
+            className="mb-4 h-12 w-12 text-foreground/10"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={1}
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"
+            />
+          </svg>
+          <p className="mb-1 text-sm font-medium text-text-muted">
+            {packages.length === 0
+              ? "No packages logged yet"
+              : "No packages match your filters"}
+          </p>
+          <p className="text-xs text-text-muted/60">
+            {packages.length === 0
+              ? "Scan your first package to get started."
+              : "Try adjusting your search or filter."}
+          </p>
         </div>
-      </div>
+      ) : (
+        <>
+          {/* Mobile cards */}
+          <div className="space-y-3 md:hidden">
+            {filtered.map((pkg) => {
+              const badge = STATUS_BADGES[pkg.status] || STATUS_BADGES.received;
+              return (
+                <div key={pkg.id} className="rounded-xl border border-foreground/5 bg-white p-4 shadow-sm">
+                  <div className="mb-2 flex items-start justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">{pkg.recipient_name}</p>
+                      {pkg.room_number && (
+                        <p className="text-xs text-text-muted">Room {pkg.room_number}</p>
+                      )}
+                    </div>
+                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${badge.className}`}>
+                      {badge.label}
+                    </span>
+                  </div>
+                  <div className="mb-3 space-y-1 text-xs text-text-muted">
+                    {pkg.carrier && <p>{pkg.carrier}{pkg.tracking_number ? ` — ${pkg.tracking_number}` : ""}</p>}
+                    {!pkg.carrier && pkg.tracking_number && <p className="font-mono">{pkg.tracking_number}</p>}
+                    {pkg.storage_location && <p>📍 {pkg.storage_location}</p>}
+                    {pkg.received_at && (
+                      <p>
+                        {new Date(pkg.received_at).toLocaleString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    )}
+                  </div>
+                  {(pkg.status === "received" || pkg.status === "notified") && (
+                    <button
+                      onClick={() => markPickedUp(pkg)}
+                      className="w-full rounded-lg bg-emerald-50 py-2 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+                    >
+                      Mark Picked Up
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden overflow-hidden rounded-xl border border-foreground/5 bg-white shadow-sm md:block">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-foreground/5">
+                    {["Tracking #", "Recipient", "Carrier", "Status", "Received", "Storage", "Actions"].map(
+                      (col) => (
+                        <th
+                          key={col}
+                          className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-muted/60"
+                        >
+                          {col}
+                        </th>
+                      )
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-foreground/5">
+                  {filtered.map((pkg) => {
+                    const badge = STATUS_BADGES[pkg.status] || STATUS_BADGES.received;
+                    return (
+                      <tr key={pkg.id} className="hover:bg-surface-alt/50 transition-colors">
+                        <td className="px-6 py-4 text-sm font-mono text-foreground/70">
+                          {pkg.tracking_number || "—"}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm font-medium text-foreground">
+                            {pkg.recipient_name}
+                          </div>
+                          {pkg.room_number && (
+                            <div className="text-xs text-text-muted">
+                              Room {pkg.room_number}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-text-muted">
+                          {pkg.carrier || "—"}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${badge.className}`}
+                          >
+                            {badge.label}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-text-muted">
+                          {pkg.received_at
+                            ? new Date(pkg.received_at).toLocaleString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })
+                            : "—"}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-text-muted">
+                          {pkg.storage_location || "—"}
+                        </td>
+                        <td className="px-6 py-4">
+                          {(pkg.status === "received" || pkg.status === "notified") && (
+                            <button
+                              onClick={() => markPickedUp(pkg)}
+                              className="rounded-md bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+                            >
+                              Mark Picked Up
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
