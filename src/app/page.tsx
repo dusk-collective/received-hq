@@ -22,6 +22,12 @@ function NavBar() {
               Pricing
             </Link>
             <Link
+              href="/demo"
+              className="text-sm font-medium tracking-tight text-purple transition-colors hover:text-purple-hover"
+            >
+              Try Demo
+            </Link>
+            <Link
               href="/login"
               className="text-sm font-medium tracking-tight text-foreground/60 transition-colors hover:text-foreground"
             >
@@ -65,10 +71,10 @@ function HeroSection() {
             Start Free Trial
           </Link>
           <Link
-            href="#how-it-works"
+            href="/demo"
             className="inline-flex h-13 items-center rounded-lg border border-foreground/10 bg-white px-8 text-base font-semibold text-foreground transition-all hover:bg-surface-alt"
           >
-            Watch Demo
+            Try Demo
           </Link>
         </div>
       </div>

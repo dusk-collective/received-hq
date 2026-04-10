@@ -19,18 +19,21 @@ export default function ScanPage() {
   const [carrier, setCarrier] = useState("");
   const [recipientType, setRecipientType] = useState("guest");
   const [roomNumber, setRoomNumber] = useState("");
+  const [checkoutDate, setCheckoutDate] = useState("");
+  const [guestEmail, setGuestEmail] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
   const [storageLocation, setStorageLocation] = useState("");
   const [notes, setNotes] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [savedPackageId, setSavedPackageId] = useState<string | null>(null);
 
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Show preview
     const reader = new FileReader();
     reader.onload = async (ev) => {
       const base64 = ev.target?.result as string;
@@ -55,7 +58,6 @@ export default function ScanPage() {
         if (data.tracking_number) setTrackingNumber(data.tracking_number);
         if (data.recipient_name) setRecipientName(data.recipient_name);
         if (data.carrier) {
-          // Normalize carrier name
           const normalized = data.carrier.toLowerCase();
           if (normalized.includes("fedex")) setCarrier("FedEx");
           else if (normalized.includes("ups")) setCarrier("UPS");
@@ -82,12 +84,9 @@ export default function ScanPage() {
     setSaveError("");
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Get property and staff info
       const { data: staffData } = await supabase
         .from("staff")
         .select("id, property_id")
@@ -96,20 +95,70 @@ export default function ScanPage() {
 
       if (!staffData) throw new Error("No property found");
 
-      const { error } = await supabase.from("packages").insert({
+      const hasContact = !!(guestEmail || guestPhone);
+      const notificationStatus = hasContact ? "pending" : "no_contact";
+
+      // Check if storage fees are enabled
+      const { data: propData } = await supabase
+        .from("properties")
+        .select("storage_fee_enabled")
+        .eq("id", staffData.property_id)
+        .single();
+
+      const { data: pkg, error } = await supabase.from("packages").insert({
         property_id: staffData.property_id,
         tracking_number: trackingNumber || null,
         carrier: carrier || null,
         recipient_name: recipientName,
         recipient_type: recipientType,
         room_number: roomNumber || null,
+        checkout_date: checkoutDate || null,
+        guest_email: guestEmail || null,
+        guest_phone: guestPhone || null,
         storage_location: storageLocation || null,
         notes: notes || null,
+        notification_status: notificationStatus,
+        storage_fee_charged: propData?.storage_fee_enabled || false,
         received_by: staffData.id,
         label_data: imagePreview ? { scanned: true } : null,
-      });
+      }).select("id").single();
 
       if (error) throw error;
+
+      // Create audit event
+      if (pkg) {
+        setSavedPackageId(pkg.id);
+        await supabase.from("package_events").insert({
+          package_id: pkg.id,
+          event_type: "created",
+          details: {
+            recipient_name: recipientName,
+            carrier: carrier || null,
+            tracking_number: trackingNumber || null,
+            scanned: !!imagePreview,
+          },
+          created_by: staffData.id,
+        });
+
+        // Queue notification if contact info exists
+        if (hasContact) {
+          // TODO: Wire up actual email sending (nodemailer, Resend, etc.)
+          // Status stays 'received' — notification_status tracks the notification lifecycle separately
+          await supabase.from("packages").update({
+            notification_status: "pending",
+          }).eq("id", pkg.id);
+
+          await supabase.from("package_events").insert({
+            package_id: pkg.id,
+            event_type: "notification_queued",
+            details: {
+              method: guestEmail ? "email" : "phone",
+              description: "Notification queued for delivery",
+            },
+            created_by: staffData.id,
+          });
+        }
+      }
 
       setSuccess(true);
     } catch (err: unknown) {
@@ -127,11 +176,15 @@ export default function ScanPage() {
     setCarrier("");
     setRecipientType("guest");
     setRoomNumber("");
+    setCheckoutDate("");
+    setGuestEmail("");
+    setGuestPhone("");
     setStorageLocation("");
     setNotes("");
     setSuccess(false);
     setSaveError("");
     setScanError("");
+    setSavedPackageId(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
@@ -145,9 +198,14 @@ export default function ScanPage() {
             </svg>
           </div>
           <h2 className="mb-2 text-xl font-bold text-foreground">Package Logged</h2>
-          <p className="mb-6 text-sm text-text-muted">
+          <p className="mb-2 text-sm text-text-muted">
             {recipientName}&apos;s package has been recorded successfully.
           </p>
+          {!(guestEmail || guestPhone) && roomNumber && (
+            <div className="mb-4 rounded-lg bg-yellow-50 px-4 py-3 text-sm text-yellow-700">
+              No contact info provided. Please notify at front desk: {recipientName}, Room {roomNumber}
+            </div>
+          )}
           <div className="flex gap-3">
             <button
               onClick={resetForm}
@@ -155,11 +213,19 @@ export default function ScanPage() {
             >
               Scan Another
             </button>
+            {savedPackageId && (
+              <button
+                onClick={() => router.push(`/dashboard/packages/${savedPackageId}`)}
+                className="rounded-lg border border-foreground/10 px-6 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-surface-alt"
+              >
+                View Package
+              </button>
+            )}
             <button
               onClick={() => router.push("/dashboard")}
               className="rounded-lg border border-foreground/10 px-6 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-surface-alt"
             >
-              Go to Dashboard
+              Dashboard
             </button>
           </div>
         </div>
@@ -169,7 +235,6 @@ export default function ScanPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-foreground">Log a Package</h1>
         <p className="mt-1 text-sm text-text-muted">
@@ -247,7 +312,7 @@ export default function ScanPage() {
         )}
       </div>
 
-      {/* Manual Entry Form */}
+      {/* Enrichment Form */}
       <div className="rounded-2xl border border-foreground/5 bg-white p-5 shadow-sm sm:p-8">
         <h3 className="mb-6 text-base font-semibold text-foreground">
           Package Details
@@ -260,19 +325,6 @@ export default function ScanPage() {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid gap-5 sm:grid-cols-2">
             <div>
-              <label htmlFor="tracking" className="mb-1.5 block text-sm font-medium text-foreground/70">
-                Tracking Number
-              </label>
-              <input
-                id="tracking"
-                type="text"
-                value={trackingNumber}
-                onChange={(e) => setTrackingNumber(e.target.value)}
-                placeholder="1Z999AA10123456784"
-                className="h-11 w-full rounded-lg border border-foreground/10 bg-surface-alt px-4 text-sm text-foreground placeholder-foreground/30 outline-none transition-colors focus:border-purple"
-              />
-            </div>
-            <div>
               <label htmlFor="recipient" className="mb-1.5 block text-sm font-medium text-foreground/70">
                 Recipient Name <span className="text-red-500">*</span>
               </label>
@@ -283,6 +335,19 @@ export default function ScanPage() {
                 value={recipientName}
                 onChange={(e) => setRecipientName(e.target.value)}
                 placeholder="Guest name"
+                className="h-11 w-full rounded-lg border border-foreground/10 bg-surface-alt px-4 text-sm text-foreground placeholder-foreground/30 outline-none transition-colors focus:border-purple"
+              />
+            </div>
+            <div>
+              <label htmlFor="tracking" className="mb-1.5 block text-sm font-medium text-foreground/70">
+                Tracking Number
+              </label>
+              <input
+                id="tracking"
+                type="text"
+                value={trackingNumber}
+                onChange={(e) => setTrackingNumber(e.target.value)}
+                placeholder="1Z999AA10123456784"
                 className="h-11 w-full rounded-lg border border-foreground/10 bg-surface-alt px-4 text-sm text-foreground placeholder-foreground/30 outline-none transition-colors focus:border-purple"
               />
             </div>
@@ -341,18 +406,60 @@ export default function ScanPage() {
               />
             </div>
             <div>
-              <label htmlFor="location" className="mb-1.5 block text-sm font-medium text-foreground/70">
-                Storage Location
+              <label htmlFor="checkout" className="mb-1.5 block text-sm font-medium text-foreground/70">
+                Guest Checkout Date
               </label>
               <input
-                id="location"
-                type="text"
-                value={storageLocation}
-                onChange={(e) => setStorageLocation(e.target.value)}
-                placeholder="Shelf A3, Back office, etc."
+                id="checkout"
+                type="date"
+                value={checkoutDate}
+                onChange={(e) => setCheckoutDate(e.target.value)}
+                className="h-11 w-full rounded-lg border border-foreground/10 bg-surface-alt px-4 text-sm text-foreground outline-none transition-colors focus:border-purple"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div>
+              <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-foreground/70">
+                Guest Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={guestEmail}
+                onChange={(e) => setGuestEmail(e.target.value)}
+                placeholder="guest@example.com"
                 className="h-11 w-full rounded-lg border border-foreground/10 bg-surface-alt px-4 text-sm text-foreground placeholder-foreground/30 outline-none transition-colors focus:border-purple"
               />
             </div>
+            <div>
+              <label htmlFor="phone" className="mb-1.5 block text-sm font-medium text-foreground/70">
+                Guest Phone
+              </label>
+              <input
+                id="phone"
+                type="tel"
+                value={guestPhone}
+                onChange={(e) => setGuestPhone(e.target.value)}
+                placeholder="(555) 123-4567"
+                className="h-11 w-full rounded-lg border border-foreground/10 bg-surface-alt px-4 text-sm text-foreground placeholder-foreground/30 outline-none transition-colors focus:border-purple"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="location" className="mb-1.5 block text-sm font-medium text-foreground/70">
+              Storage Location
+            </label>
+            <input
+              id="location"
+              type="text"
+              value={storageLocation}
+              onChange={(e) => setStorageLocation(e.target.value)}
+              placeholder="Shelf B-3, Back office, etc."
+              className="h-11 w-full rounded-lg border border-foreground/10 bg-surface-alt px-4 text-sm text-foreground placeholder-foreground/30 outline-none transition-colors focus:border-purple"
+            />
           </div>
 
           <div>
@@ -368,6 +475,12 @@ export default function ScanPage() {
               className="w-full resize-none rounded-lg border border-foreground/10 bg-surface-alt px-4 py-3 text-sm text-foreground placeholder-foreground/30 outline-none transition-colors focus:border-purple"
             />
           </div>
+
+          {(guestEmail || guestPhone) && (
+            <div className="rounded-lg bg-purple/5 px-4 py-3 text-sm text-purple">
+              Guest will be notified automatically via {guestEmail ? "email" : "phone"} when this package is logged.
+            </div>
+          )}
 
           <button
             type="submit"

@@ -2,11 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 export default function SignupPage() {
-  const router = useRouter();
   const [propertyName, setPropertyName] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -28,8 +26,6 @@ export default function SignupPage() {
 
       if (authError) throw authError;
       if (!authData.user) throw new Error("Signup failed — no user returned.");
-
-      const userId = authData.user.id;
 
       // 2. Sign in immediately to establish session cookies
       const { error: signInError } = await supabase.auth.signInWithPassword({
